@@ -26,7 +26,7 @@ const quizQuestions = [
       {
     "id": 1,
     "title": "Question 1: Find the Intercept",
-    "prompt": "Move the graph until Intercept = 4 on quantity axis.",
+    "prompt": "Move the graph until Intercept = 2 on quantity axis.",
     "validationState": { "intercept": -4 },
     "render": renderQuiz,
     "evaluate": evaluateGraph,
