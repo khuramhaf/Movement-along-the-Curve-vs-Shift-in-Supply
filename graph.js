@@ -37,7 +37,7 @@ const supplyLineHitbox = supplyGroup.append("line")
     .attr("class", "demand-line-hitbox");
 
 const supplyLineVisible = supplyGroup.append("line")
-    .attr("class", "demand-line")
+    .attr("class", "supply-line")
     .attr("stroke", "red"); 
 
 const xDropLine = g.append("line").attr("class", "proj-line");

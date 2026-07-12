@@ -64,6 +64,7 @@ function animatePriceChange(newPrice, duration) {
 
 function animateIntercept(targetIntercept, duration = 2000) {
 
+
     g.selectAll(".ghost-layer")
         .interrupt()
         .remove();

@@ -100,6 +100,15 @@
 
          .demand-line{
     fill:none;
+    stroke:var(--accent-dark);
+    
+    stroke-width:4px; /* Increased line stroke width */
+    pointer-events: none;
+  }
+
+
+          .supply-line{
+    fill:none;
     
     stroke-width:4px; /* Increased line stroke width */
     pointer-events: none;
