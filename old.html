@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movement Along vs. Shift in Supply</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --text-main: #1f2937;
+            --bg-light: #f3f4f6;
+            --surplus-color: #dc2626;
+            --shortage-color: #0284c7;
+            --equilibrium-color: #16a34a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: var(--text-main);
+            background-color: #fafafa;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        /* Master Grid Split Layout matched from demand.html */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr; 
+            gap: 25px;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+        }
+
+        .interactive-section {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        /* Cleaned, Simplified Lesson Container from demand.html */
+        .lesson-text-section {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-light);
+            padding: 24px;
+            border-left: 5px solid var(--primary);
+            border-radius: 6px;
+            height: fit-content;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            margin-top: 0;
+            color: #111827;
+        }
+
+        .lesson-text-section p, .lesson-text-section li {
+            font-size: 1.1rem;
+            line-height: 1.5;
+            color: #374151;
+        }
+
+        .lesson-text-section ul {
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+
+        .lesson-text-section li {
+            margin-bottom: 8px;
+        }
+
+        /* Desktop square aspect ratio layout rules from demand.html */
+        #chart-wrapper {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1.45 / 1; 
+            position: relative;
+            touch-action: pan-y; 
+            margin-bottom: 5px;
+        }
+
+        /* Responsive Mobile Layout Rules Toggle matched exactly from demand.html */
+        @media (max-width: 768px) {
+            body {
+                padding: 0;
+            }
+            .workspace-grid {
+                grid-template-columns: 1fr; 
+                padding: 12px;
+                border-radius: 0;
+                box-shadow: none;
+                gap: 12px;
+            }
+            .interactive-section {
+                order: 1; 
+            }
+            #chart-wrapper {
+                height: 45vh; 
+                aspect-ratio: auto;
+            }
+            .lesson-text-section {
+                order: 2; 
+                border-left: none;
+                border-top: 5px solid var(--primary);
+                padding: 15px;
+            }
+        }
+
+        /* Live HUD Stats Row Layout Panel situated below graph, above controls */
+        .live-stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: #fdfdfd;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .hud-formula {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #dc2626;
+            font-family: monospace, sans-serif;
+        }
+
+        .hud-quantity {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--primary-dark);
+            font-family: monospace, sans-serif;
+        }
+
+        /* Controls Panel Options Grid matched from demand.html */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #f8fafc;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .control-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .label-group label {
+            font-size: 1.2rem; 
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .slider-input-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+        }
+
+        /* Thick, Touch-Friendly Sliders from demand.html */
+        .thick-slider {
+            flex-grow: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 18px; 
+            border-radius: 9px;
+            background: #cbd5e1;
+            outline: none;
+        }
+
+        .thick-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+        }
+
+        .thick-slider::-moz-range-thumb {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+        }
+
+        .shift-slider::-webkit-slider-thumb { background: #dc2626; }
+        .shift-slider::-moz-range-thumb { background: #dc2626; }
+
+        /* Chunky Form Input Fields from demand.html */
+        .num-input {
+            width: 85px;
+            padding: 8px 4px;
+            font-size: 1.15rem; 
+            border: 2px solid #94a3b8;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 800;
+            color: var(--primary-dark);
+        }
+
+        .num-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        /* Vector Graphic Styles Elements Rules from demand.html */
+        .axis-line {
+            stroke: #000000;
+            stroke-width: 4px;
+        }
+
+        .axis-text {
+            font-size: 19px; 
+            font-weight: bold;
+            fill: #000000;
+        }
+
+        .axis-label {
+            font-size: 19px; 
+            font-weight: 900;
+            fill: #1e293b;
+        }
+
+        .supply-line-hitbox {
+            stroke: transparent;
+            stroke-width: 24px;
+            cursor: grab;
+            fill: none;
+        }
+        .supply-line-hitbox:active {
+            cursor: grabbing;
+        }
+
+        .supply-line {
+            stroke: #dc2626;
+            stroke-width: 5px; 
+            stroke-linecap: round;
+            pointer-events: none;
+        }
+
+        .projection-line {
+            stroke: #475569;
+            stroke-width: 4px; 
+            stroke-dasharray: 6,6; 
+        }
+
+        .interactive-dot {
+            fill: var(--primary);
+            cursor: grab;
+            touch-action: none;
+        }
+        
+        .interactive-dot:active {
+            cursor: grabbing;
+        }
+
+        .dot-glow {
+            fill: var(--primary);
+            fill-opacity: 0.15; 
+            cursor: grab;
+            touch-action: none;
+        }
+        .dot-glow:active {
+            cursor: grabbing;
+        }
+
+        .reference-line {
+            stroke: #dc2626;
+            stroke-width: 4px;
+            stroke-linecap: round;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .reference-projection {
+            stroke: #94a3b8;
+            stroke-width: 3px;
+            stroke-dasharray: 5,5;
+            opacity: 1;
+        }
+
+        .reference-dot {
+            fill: #64748b;
+            opacity: 1;
+        }
+
+        #equation-display {
+            text-align: center; 
+            font-size: 1.35rem; 
+            font-weight: bold; 
+            color: #dc2626; 
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="workspace-grid">
+    
+    <div class="interactive-section">
+        <div id="chart-wrapper"></div>
+
+        <!-- Positioned equation readouts between chart and sliders matching demand layout -->
+        <div class="live-stats-row">
+            <div id="hud-formula-display" class="hud-formula">P=2Q<sub>s</sub></div>
+            <div id="hud-quantity-display" class="hud-quantity">Q<sub>s</sub>=5.00</div>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <div class="label-group">
+                    <label for="price-slider">Movement Along Curve: Price (P)</label>
+                </div>
+                <div class="slider-input-container">
+                    <input type="range" id="price-slider" class="thick-slider" min="0" max="30" step="0.1" value="10">
+                    <input type="number" id="price-input" class="num-input" min="0" max="30" step="0.1" value="10.0">
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div class="label-group">
+                    <label for="shift-slider">Shift Supply Curve: Intercept (A)</label>
+                </div>
+                <div class="slider-input-container">
+                    <input type="range" id="shift-slider" class="thick-slider shift-slider" min="-10" max="20" step="0.2" value="0">
+                    <input type="number" id="shift-input" class="num-input" min="-10" max="20" step="0.1" value="0.0">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="lesson-text-section">
+        <h1>Movement vs. Shift in Supply</h1>
+        <p>Explore the crucial difference between changes along a fixed supply curve versus a shift of the entire curve:</p>
+        
+        <div id="equation-display">P = 2Q<sub>s</sub></div>
+        
+        <ul>
+            <li><strong>Movement Along Curve (Blue Sliders/Dot):</strong> Caused <em>only</em> by a change in the price of the good itself. Drag the <strong>Blue Dot</strong> or change the <strong>Price Slider</strong>.</li>
+            <li><strong>Shift in Supply (Red Slider/Grab Curve):</strong> Caused by outside production factors (costs, technology). <strong>Grab and drag the red line directly</strong>, or adjust the <strong>Intercept Slider</strong>.</li>
+            <li><strong>Faded Baseline View:</strong> The light, faded red line and grey dot represent your starting baseline position ($P=10, Q_s=5$) for clear comparison.</li>
+        </ul>
+    </div>
+
+</div>
+
+<script>
+    const wrapper = d3.select("#chart-wrapper");
+    
+    let intercept = 0.0; 
+    let currentPrice = 10.0;
+    const slope = 2; 
+
+    const refIntercept = 0.0;
+    const refPrice = 10.0;
+    const refQuantity = 5.0;
+
+    function renderChart() {
+        wrapper.selectAll("*").remove();
+
+        const width = wrapper.node().getBoundingClientRect().width;
+        const height = wrapper.node().getBoundingClientRect().height;
+        const isMobile = window.innerWidth <= 768;
+
+        const margin = { 
+            top: 35, 
+            right: isMobile ? 22 : 45,  
+            bottom: 55, 
+            left: isMobile ? 40 : 40    
+        };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const svg = wrapper.append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const g = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const xScale = d3.scaleLinear().domain([0, 15]).range([0, chartWidth]);
+        const yScale = d3.scaleLinear().domain([0, 30]).range([chartHeight, 0]);
+
+        g.append("line").attr("class", "axis-line").attr("x1", 0).attr("y1", chartHeight).attr("x2", chartWidth).attr("y2", chartHeight);
+        g.append("line").attr("class", "axis-line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", chartHeight);
+
+        const xTicks = d3.range(0, 16, 2);
+        const yTicks = d3.range(0, 31, 5);
+
+        g.selectAll(".x-tick").data(xTicks).enter().append("text")
+            .attr("class", "axis-text")
+            .attr("x", d => xScale(d))
+            .attr("y", chartHeight + 20) 
+            .attr("text-anchor", "middle")
+            .text(d => d);
+
+        g.selectAll(".y-tick").data(yTicks).enter().append("text")
+            .attr("class", "axis-text")
+            .attr("x", -8)              
+            .attr("y", d => yScale(d) + 6) 
+            .attr("text-anchor", "end")
+            .text(d => d);
+
+        g.append("text").attr("class", "axis-label").attr("x", chartWidth).attr("y", chartHeight + 40).attr("text-anchor", "end").text("Quantity Supplied (Q_s)");
+        g.append("text").attr("class", "axis-label").attr("y", -15).attr("x", 50).attr("text-anchor", "end").text("Price (P)");
+
+        function getQ(p, inter) { return Math.max(0, (p - inter) / slope); }
+        function getP(q, inter) { return Math.max(0, inter + (slope * q)); }
+
+        // --- RENDER REFERENCE BASELINE ELEMENTS ---
+        let refQStart = Math.max(0, -refIntercept / slope);
+        let refPStart = getP(refQStart, refIntercept);
+        let refQEnd = Math.min(15, (30 - refIntercept) / slope);
+        let refPEnd = getP(refQEnd, refIntercept);
+
+        const refXPos = xScale(refQuantity);
+        const refYPos = yScale(refPrice);
+
+        g.append("line")
+            .attr("class", "reference-line")
+            .attr("x1", xScale(refQStart)).attr("y1", yScale(refPStart))
+            .attr("x2", xScale(refQEnd)).attr("y2", yScale(refPEnd));
+
+        g.append("line").attr("class", "reference-projection").attr("x1", 0).attr("y1", refYPos).attr("x2", refXPos).attr("y2", refYPos);
+        g.append("line").attr("class", "reference-projection").attr("x1", refXPos).attr("y1", chartHeight).attr("x2", refXPos).attr("y2", refYPos);
+
+        g.append("circle").attr("class", "reference-dot").attr("cx", refXPos).attr("cy", refYPos).attr("r", 9);
+
+        // --- RENDER LIVE INTERACTIVE ELEMENTS ---
+        const curveGroup = g.append("g");
+        const supplyLine = curveGroup.append("line").attr("class", "supply-line");
+        const supplyHitbox = curveGroup.append("line").attr("class", "supply-line-hitbox");
+
+        const horizLine = g.append("line").attr("class", "projection-line");
+        const vertLine = g.append("line").attr("class", "projection-line");
+
+        const dotRadius = Math.max(13, xScale(0.17) - xScale(0));
+        const glowRadius = dotRadius * 2.0; 
+
+        const glow = g.append("circle").attr("class", "dot-glow").attr("r", glowRadius);
+        const dot = g.append("circle").attr("class", "interactive-dot").attr("r", dotRadius);
+
+        function updateVisuals(origin) {
+            let minValidPrice = Math.max(0, intercept);
+            currentPrice = Math.max(minValidPrice, Math.min(30, currentPrice));
+            let currentQuantity = getQ(currentPrice, intercept);
+
+            let xPos = xScale(currentQuantity);
+            let yPos = yScale(currentPrice);
+
+            let qStart = Math.max(0, -intercept / slope);
+            let pStart = getP(qStart, intercept);
+            let qEnd = Math.min(15, (30 - intercept) / slope);
+            let pEnd = getP(qEnd, intercept);
+
+            supplyLine.attr("x1", xScale(qStart)).attr("y1", yScale(pStart)).attr("x2", xScale(qEnd)).attr("y2", yScale(pEnd));
+            supplyHitbox.attr("x1", xScale(qStart)).attr("y1", yScale(pStart)).attr("x2", xScale(qEnd)).attr("y2", yScale(pEnd));
+
+            dot.attr("cx", xPos).attr("cy", yPos);
+            glow.attr("cx", xPos).attr("cy", yPos);
+
+            horizLine.attr("x1", 0).attr("y1", yPos).attr("x2", xPos).attr("y2", yPos);
+            vertLine.attr("x1", xPos).attr("y1", chartHeight).attr("x2", xPos).attr("y2", yPos);
+
+            let htmlFormulaString = "";
+            let hudFormulaString = "";
+            if (intercept === 0) {
+                htmlFormulaString = "P = 2Q<sub>s</sub>";
+                hudFormulaString = "P=2Q<sub>s</sub>";
+            } else if (intercept > 0) {
+                htmlFormulaString = `P = ${intercept.toFixed(1)} + 2Q<sub>s</sub>`;
+                hudFormulaString = `P=${intercept.toFixed(1)}+2Q<sub>s</sub>`;
+            } else {
+                htmlFormulaString = `P = 2Q<sub>s</sub> - ${Math.abs(intercept).toFixed(1)}`;
+                hudFormulaString = `P=2Q<sub>s</sub>-${Math.abs(intercept).toFixed(1)}`;
+            }
+            const hudQuantityString = `Q<sub>s</sub>=${currentQuantity.toFixed(2)}`;
+
+            d3.select("#equation-display").html(htmlFormulaString);
+            d3.select("#hud-formula-display").html(hudFormulaString);
+            d3.select("#hud-quantity-display").html(hudQuantityString);
+
+            if (origin !== 'price-slider') d3.select("#price-slider").property("value", currentPrice);
+            if (origin !== 'price-input') d3.select("#price-input").property("value", parseFloat(currentPrice.toFixed(1)));
+            if (origin !== 'shift-slider') d3.select("#shift-slider").property("value", intercept);
+            if (origin !== 'shift-input') d3.select("#shift-input").property("value", parseFloat(intercept.toFixed(1)));
+        }
+
+        // 1. Dragging Blue Dot Interaction
+        const dotDrag = d3.drag()
+            .on("drag", function(event) {
+                let targetQ = xScale.invert(event.x);
+                let maxQ = (30 - intercept) / slope;
+                let minQ = Math.max(0, -intercept / slope);
+                targetQ = Math.max(minQ, Math.min(maxQ, targetQ));
+                currentPrice = getP(targetQ, intercept);
+                updateVisuals('drag-dot');
+            });
+        dot.call(dotDrag);
+        glow.call(dotDrag);
+
+        // 2. Line Dragging Intercept Shift Interaction
+        let dragStartIntercept = intercept;
+        const lineDrag = d3.drag()
+            .on("start", function() {
+                dragStartIntercept = intercept;
+            })
+            .on("drag", function(event) {
+                let deltaQ = xScale.invert(event.x) - xScale.invert(event.subject.x || event.x);
+                if (isNaN(deltaQ)) deltaQ = 0;
+                
+                let rawNewIntercept = dragStartIntercept - (deltaQ * slope);
+                intercept = Math.max(-10, Math.min(20, rawNewIntercept));
+                updateVisuals('drag-line');
+            });
+        supplyHitbox.call(lineDrag);
+
+        // 3. Form Input Action Handlers
+        d3.select("#price-slider").on("input", function() {
+            currentPrice = +this.value;
+            updateVisuals('price-slider');
+        });
+
+        d3.select("#price-input").on("input", function() {
+            let val = +this.value;
+            if (!isNaN(val)) {
+                currentPrice = val;
+                updateVisuals('price-input');
+            }
+        });
+
+        d3.select("#shift-slider").on("input", function() {
+            intercept = +this.value;
+            updateVisuals('shift-slider');
+        });
+
+        d3.select("#shift-input").on("input", function() {
+            let val = +this.value;
+            if (!isNaN(val)) {
+                intercept = Math.max(-10, Math.min(20, val));
+                updateVisuals('shift-input');
+            }
+        });
+
+        updateVisuals('init');
+    }
+
+    renderChart();
+    window.addEventListener("resize", renderChart);
+</script>
+
+</body>
+</html>
